@@ -1,13 +1,13 @@
-# GarageIQ — Phase 1
+# GarageIQ — Vehicle Management
 
-Native SwiftUI foundation for the CPSC 411 project. Targets iOS 17+, uses SwiftData, and has no third-party dependencies. Only the foundation is implemented.
+Native SwiftUI foundation for the CPSC 411 project. Targets iOS 17+, uses SwiftData, and has no third-party dependencies. The foundation and vehicle management are implemented.
 
 ## Open and build
 
 1. Open `GarageIQ.xcodeproj` with Xcode 15 or newer.
 2. Choose the GarageIQ scheme and an installed iPhone simulator.
 3. Press Command-B to build, then Command-R to run.
-4. Confirm Dashboard, Maintenance, Reminders, and Garage each open their placeholder screen.
+4. Open Garage, add a vehicle, tap its row to edit, and swipe to edit or delete. Other tabs remain placeholders.
 
 For a device, set your signing team and a unique bundle identifier in the target's Signing & Capabilities settings. The current identifier is `com.example.GarageIQ`.
 
@@ -17,7 +17,7 @@ Command-line build from this folder on a Mac with Xcode selected:
 xcodebuild -project GarageIQ.xcodeproj -scheme GarageIQ -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-Build status: NOT VERIFIED. The creation environment has no Xcode, Swift compiler, or iOS SDK. The project plist, scheme XML, source membership, and file references were checked; these checks do not replace compilation. Complete the build and simulator checks above before Phase 2. No persistence relaunch test has been performed; that belongs with vehicle entry in Phase 2.
+Build status: NOT VERIFIED. Xcode 26.3 was located at `/Users/Robby/Downloads/Xcode.app`. A simulator build was attempted using an explicit `DEVELOPER_DIR`, but the agent sandbox blocked Swift macro plugin execution (`sandbox-exec: sandbox_apply: Operation not permitted`), causing SwiftData macro expansion failures. Simulator services were also unavailable in this environment. Run the build from Xcode to complete verification. The project plist, scheme XML, source membership, and file references were checked; these checks do not replace compilation. Complete the build and simulator checks below before proceeding. Persistence relaunch testing remains pending.
 
 ## Folder and file guide
 
@@ -37,8 +37,10 @@ GarageIQ/
 │   │   ├── Dashboard/DashboardView.swift
 │   │   ├── Maintenance/MaintenanceView.swift
 │   │   ├── Reminders/RemindersView.swift
-│   │   └── Garage/GarageView.swift
-│   ├── ViewModels/.gitkeep
+│   │   └── Garage/
+│   │       ├── GarageView.swift
+│   │       └── AddVehicleView.swift
+│   ├── ViewModels/VehicleFormData.swift
 │   ├── Services/.gitkeep
 │   ├── Utilities/.gitkeep
 │   └── Resources/Assets.xcassets/Contents.json
@@ -54,8 +56,10 @@ GarageIQ/
 - **DashboardView.swift** shows the overview placeholder.
 - **MaintenanceView.swift** shows the service-history placeholder.
 - **RemindersView.swift** shows the reminders placeholder.
-- **GarageView.swift** shows the vehicle-management placeholder.
-- **ViewModels, Services, Utilities** are reserved folders. Their `.gitkeep` files preserve empty directories. No artificial view models are needed for static screens.
+- **GarageView.swift** fetches all saved vehicles, displays them newest-added first, opens add/edit sheets, and confirms deletion.
+- **AddVehicleView.swift** shares one form for adding and editing, validates on Save, and reports persistence failures.
+- **VehicleFormData.swift** holds a temporary value-type draft, validates required fields and numeric ranges, and applies valid changes to a model.
+- **ViewModels, Services, Utilities** are reserved folders. Their `.gitkeep` files preserve empty directories. VehicleFormData separates form state and validation from the Garage views.
 - **Assets.xcassets/Contents.json** starts the asset catalog. App icons can be added before distribution.
 - **project.pbxproj** defines the native iOS app target and its source files, resources, and Debug/Release settings. The shared **GarageIQ.xcscheme** supports build and run without a project generator.
 - **.gitignore** excludes local Xcode state and build output.
@@ -70,8 +74,32 @@ GarageIQ/
 - A type ending in `?` is optional: it can contain a value or `nil`. Child relationships are optional for persistence lifecycle handling, but the initializers require a vehicle when creating a child.
 - `init` assigns initial values. Default arguments let callers omit values such as empty notes or today's date.
 - `.modelContainer(for:)` sets up storage and makes a model context available through the SwiftUI environment. Later phases can use `@Query` to fetch models and `@Environment(\.modelContext)` for mutations.
-- `#Preview` provides an Xcode canvas preview. These placeholders do not query data, so their previews need no model container yet.
+- `#Preview` provides an Xcode canvas preview. Garage, the editor, and main-tab previews use an in-memory model container so previews do not affect saved app data.
 
-Model initializers are intentionally just data initialization. Vehicle form validation, nondecreasing mileage updates, reminder deadline validation (at least one deadline), selection, and CRUD behavior are deferred to their requested phases. No sample records are inserted. No AI service or network integration is implemented.
+Model initializers only initialize data. The vehicle editor now validates trimmed make/model, year from 1900 through current year + 1, and whole-number mileage of at least zero. Blank VIN and plate become nil. Editing can correct mileage downward; the separate dashboard mileage-update action is not implemented. No Maintenance, Reminder, or AI behavior has been added.
 
-Apple references: [SwiftData persistence](https://developer.apple.com/documentation/swiftdata/preserving-your-apps-model-data-across-launches) and [model relationships](https://developer.apple.com/documentation/swiftdata/defining-data-relationships-with-enumerations-and-model-classes/).
+## SwiftData operations in vehicle management
+
+- `@Query(sort: \Vehicle.dateAdded, order: .reverse)` fetches vehicles and keeps the list up to date with model changes.
+- `@Environment(\.modelContext)` uses the context from the app's existing on-disk container.
+- `insert` registers a new vehicle. Editing assigns fields on the existing model; no duplicate is inserted and its ID/dateAdded stay intact.
+- `save()` explicitly persists additions, edits, and deletions and allows errors to be displayed before dismissing the editor.
+- `delete` marks a vehicle for deletion. The existing cascade relationships also delete related records and reminders after saving.
+- `rollback()` discards pending context changes if saving fails. This is appropriate while Garage is the only writer; revisit context isolation when adding concurrent editing flows in later phases.
+- Cancel discards the form draft without ever changing the persisted model.
+
+## Simulator verification checklist (not yet run)
+
+1. Start with an empty store: verify the empty state and toolbar Add button.
+2. Add two vehicles with different values in all fields. Verify both rows and their mileage.
+3. Submit empty and whitespace-only make/model; verify inline errors and no saved vehicle.
+4. Test years 1899, 1900, current year + 1, and current year + 2. Only the middle two are accepted.
+5. Test blank, negative, decimal, alphabetic, and excessively large mileage text. Reject these; accept zero and positive whole numbers.
+6. Reopen a saved vehicle: verify all eight fields. Save changes, including a lower mileage correction; verify no duplicate row.
+7. Edit fields and Cancel or swipe down the sheet; verify the saved data is unchanged.
+8. Leave VIN and plate blank and save; reopen to verify they remain blank.
+9. Swipe Delete and cancel; verify the row remains. Confirm deletion; verify only the selected vehicle disappears.
+10. Force-quit and relaunch: verify additions and edits persist and deleted vehicles stay deleted.
+11. Confirm the other tabs still show their existing placeholders.
+
+Apple reference: [ModelContext](https://developer.apple.com/documentation/swiftdata/modelcontext).
