@@ -8,6 +8,8 @@ final class MaintenanceReminder {
     var title: String
     var dueDate: Date?
     var dueMileage: Int?
+    var repeatMonths: Int? = nil
+    var repeatMiles: Int? = nil
     var notes: String
     var completed: Bool
     var notificationEnabled: Bool

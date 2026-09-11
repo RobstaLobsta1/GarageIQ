@@ -124,3 +124,23 @@ Maintenance verification:
 - Edit each field, save, and reopen. Cancel a later edit and confirm saved values remain unchanged.
 - Test blank service type, negative/nonnumeric mileage, and invalid cost; verify no record is created. Verify blank cost and zero cost are distinct.
 - Cancel deletion, then confirm it; verify the vehicle and its other records remain. Relaunch and verify additions, edits, and deletions persist.
+
+## Dashboard: monthly maintenance costs
+
+Dashboard now contains one card for the current calendar month's maintenance costs through the current time, across all vehicles. It uses service dates, excludes future-dated records, sums Decimal costs, and distinguishes unknown costs from known zero costs. The card displays the month, total, service count, and count of records without costs. Amounts are displayed with a dollar sign and two decimal places; totals assume all entered costs are in dollars.
+
+`DashboardView` observes records with `@Query`, so additions, edits, and deletions update the total. `MonthlyMaintenanceSummary` contains the calculation, and `MonthlyMaintenanceCostCard` renders it. A periodic timeline refreshes the date while the screen is open, including month rollover. No new model fields or data migrations are needed.
+
+Verification: calculation tests cover exact decimal sums, missing versus zero cost, empty history, start-of-month inclusion, prior-month and future exclusion, and month rollover. Swift syntax and project plist checks passed. Full iOS build and visual verification remain pending under the previously documented environment limitation. On device, add/edit/delete a service dated this month and confirm the card updates; services from other months should not contribute.
+
+## Scheduled maintenance
+
+Dashboard now shows up to three active schedules and a Schedule Service button. The Reminders tab shows all active schedules and the same creation form. Choose a saved vehicle, title, first due date and/or odometer reading, optional repeat interval in months and/or miles, and notes. Both deadlines mean whichever comes first. No notification permission or local notification scheduling is implemented.
+
+Dates and mileage are separate deadlines. A mileage deadline displays distance remaining based on the vehicle's stored odometer. A past date is highlighted; reached mileage is highlighted. Blank repeat intervals mean one-time maintenance. Months must be 1–1200 and repeat miles 1–10,000,000; due mileage must be a nonnegative whole number.
+
+Mark Complete requires confirmation. For a one-time service, it sets completed=true and hides the schedule. For repeat schedules, it sets the next date to today plus the month interval and next mileage to current vehicle mileage plus the mile interval. Nonrepeating deadlines are cleared on renewal. Update the Garage odometer before completion. Schedule completion does not add a maintenance record or affect the monthly cost total; record actual work separately in Maintenance. Delete removes the schedule after confirmation.
+
+The existing SwiftData model adds optional repeatMonths and repeatMiles fields, defaulting to nil for existing schedules. Saves are explicit, with rollback and error feedback. Verify migration with an existing store before shipping; no existing store was deleted or recreated.
+
+Validation performed: Swift syntax parsing, Xcode project plist validation, and whitespace checks passed. Full SwiftData compilation, UI testing, and migration testing remain pending under the documented sandbox limitation. Simulator checks: create date-only, mileage-only, and combined schedules; reject blank titles/invalid numbers/no deadlines; verify empty Garage guidance; confirm repeating completion advances both deadlines, one-time completion hides the item, cancellation preserves it, and delete persists after relaunch. Verify the dashboard card updates alongside the full schedule list.
