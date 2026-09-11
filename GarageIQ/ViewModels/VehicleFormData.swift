@@ -9,6 +9,11 @@ struct VehicleFormData {
     var currentMileage = "0"
     var vin = ""
     var licensePlate = ""
+    var estimateEnabled = false
+    var drivingMiles = ""
+    var drivingPeriod = "Weekly"
+    var drivingPurpose = "Commuting"
+    var confirmOdometer = false
 
     init(vehicle: Vehicle? = nil) {
         guard let vehicle else { return }
@@ -20,6 +25,10 @@ struct VehicleFormData {
         currentMileage = String(vehicle.currentMileage)
         vin = vehicle.vin ?? ""
         licensePlate = vehicle.licensePlate ?? ""
+        estimateEnabled = vehicle.estimatedMilesPerPeriod != nil
+        drivingMiles = vehicle.estimatedMilesPerPeriod.map(String.init) ?? ""
+        drivingPeriod = vehicle.drivingPeriod ?? "Weekly"
+        drivingPurpose = vehicle.drivingPurpose ?? "Commuting"
     }
 
     var maximumYear: Int { Calendar.current.component(.year, from: .now) + 1 }
@@ -40,6 +49,9 @@ struct VehicleFormData {
         if parsedMileage.map({ $0 >= 0 }) != true {
             errors.append("Mileage must be a whole number of zero or greater.")
         }
+        if estimateEnabled && Int(drivingMiles.trimmingCharacters(in: .whitespacesAndNewlines)).map({ (0...100000).contains($0) }) != true {
+            errors.append("Estimated driving must be a whole number between 0 and 100,000 miles per period.")
+        }
         return errors
     }
 
@@ -50,7 +62,21 @@ struct VehicleFormData {
         vehicle.make = make.trimmingCharacters(in: .whitespacesAndNewlines)
         vehicle.model = model.trimmingCharacters(in: .whitespacesAndNewlines)
         vehicle.trim = trim.trimmingCharacters(in: .whitespacesAndNewlines)
+        let now = Date.now
+        let newRate = estimateEnabled ? Int(drivingMiles.trimmingCharacters(in: .whitespacesAndNewlines)) : nil
+        let odometerChanged = mileage != vehicle.currentMileage || confirmOdometer
+        let profileChanged = newRate != vehicle.estimatedMilesPerPeriod || drivingPeriod != vehicle.drivingPeriod
+        if odometerChanged || vehicle.estimateStartDate == nil || profileChanged {
+            // Preserve accrued estimated distance when the driving rate changes.
+            let baseline = odometerChanged ? mileage : vehicle.estimatedMileage(at: now)
+            vehicle.estimateStartMileage = baseline
+            vehicle.estimateStartDate = now
+        }
+        if odometerChanged || vehicle.odometerConfirmedDate == nil { vehicle.odometerConfirmedDate = now }
         vehicle.currentMileage = mileage
+        vehicle.estimatedMilesPerPeriod = newRate
+        vehicle.drivingPeriod = drivingPeriod
+        vehicle.drivingPurpose = drivingPurpose
         let cleanedVIN = vin.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanedPlate = licensePlate.trimmingCharacters(in: .whitespacesAndNewlines)
         vehicle.vin = cleanedVIN.isEmpty ? nil : cleanedVIN

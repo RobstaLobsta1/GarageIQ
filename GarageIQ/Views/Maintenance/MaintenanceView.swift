@@ -39,5 +39,5 @@ struct MaintenanceView: View {
 
 #Preview {
     MaintenanceView()
-        .modelContainer(for: [Vehicle.self, MaintenanceRecord.self, MaintenanceReminder.self], inMemory: true)
+        .modelContainer(for: [Vehicle.self, MaintenanceRecord.self, MaintenanceReminder.self, ChatConversation.self], inMemory: true)
 }

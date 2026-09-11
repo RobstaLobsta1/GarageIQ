@@ -22,7 +22,15 @@ struct GarageView: View {
                             Text("\(String(vehicle.year)) \(vehicle.make) \(vehicle.model) \(vehicle.trim)")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
-                            Text("\(vehicle.currentMileage.formatted()) miles")
+                            if vehicle.estimatedMilesPerPeriod != nil {
+                                TimelineView(.periodic(from: .now, by: 60)) { timeline in
+                                    Text("≈ \(vehicle.estimatedMileage(at: timeline.date).formatted()) miles estimated")
+                                        .font(.headline)
+                                }
+                                Text("\(vehicle.drivingPurpose ?? "Mixed use") · \(vehicle.estimatedMilesPerPeriod ?? 0) miles / \(vehicle.drivingPeriod == "Monthly" ? "month" : "week")")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Text("\(vehicle.currentMileage.formatted()) miles confirmed")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -92,5 +100,5 @@ struct GarageView: View {
 
 #Preview {
     GarageView()
-        .modelContainer(for: [Vehicle.self, MaintenanceRecord.self, MaintenanceReminder.self], inMemory: true)
+        .modelContainer(for: [Vehicle.self, MaintenanceRecord.self, MaintenanceReminder.self, ChatConversation.self], inMemory: true)
 }

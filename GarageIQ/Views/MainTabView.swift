@@ -4,6 +4,8 @@ import SwiftData
 struct MainTabView: View {
     var body: some View {
         TabView {
+            NavigationStack { ChatView() }
+                .tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right") }
             DashboardView()
                 .tabItem { Label("Dashboard", systemImage: "gauge.with.dots.needle.67percent") }
             MaintenanceView()
@@ -18,5 +20,5 @@ struct MainTabView: View {
 
 #Preview {
     MainTabView()
-        .modelContainer(for: [Vehicle.self, MaintenanceRecord.self, MaintenanceReminder.self], inMemory: true)
+        .modelContainer(for: [Vehicle.self, MaintenanceRecord.self, MaintenanceReminder.self, ChatConversation.self], inMemory: true)
 }

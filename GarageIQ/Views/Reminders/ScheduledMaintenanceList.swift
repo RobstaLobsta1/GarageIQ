@@ -28,8 +28,12 @@ struct ScheduledMaintenanceList: View {
                     if let mileage = reminder.dueMileage {
                         Text("Due at \(mileage.formatted()) miles")
                         if let vehicle = reminder.vehicle {
-                            Text(vehicle.currentMileage >= mileage ? "Mileage reached" : "\((mileage - vehicle.currentMileage).formatted()) miles remaining")
-                                .font(.caption).foregroundStyle(vehicle.currentMileage >= mileage ? .red : .secondary)
+                            if vehicle.estimatedMilesPerPeriod != nil, let forecast = vehicle.estimatedDueDate(for: mileage) {
+                                Text("Estimated mileage due: \(forecast.formatted(date: .abbreviated, time: .omitted))")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Text(vehicle.estimatedMileage() >= mileage ? "Mileage reached (estimated if enabled)" : "\((mileage - vehicle.estimatedMileage()).formatted()) miles remaining")
+                                .font(.caption).foregroundStyle(vehicle.estimatedMileage() >= mileage ? .red : .secondary)
                         }
                     }
                     if let months = reminder.repeatMonths { Text("Repeats every \(months) months").font(.caption) }
@@ -50,7 +54,7 @@ struct ScheduledMaintenanceList: View {
         .confirmationDialog("Complete this scheduled service?", isPresented: Binding(get: { pendingCompletion != nil }, set: { if !$0 { pendingCompletion = nil } }), titleVisibility: .visible) {
             Button("Mark Complete") { if let reminder = pendingCompletion { complete(reminder) }; pendingCompletion = nil }
             Button("Cancel", role: .cancel) { pendingCompletion = nil }
-        } message: { Text("Update the vehicle’s mileage in Garage first. Repeating deadlines advance from today and that mileage; one-time deadlines are cleared. Add a service record separately to track actual work and cost.") }
+        } message: { Text("Repeating deadlines advance from today and the estimated mileage (or confirmed odometer if estimates are off); one-time deadlines are cleared. Add a service record separately to track actual work and cost.") }
         .confirmationDialog("Delete this schedule?", isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }), titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 if let reminder = pendingDeletion { context.delete(reminder); save() }
@@ -65,7 +69,7 @@ struct ScheduledMaintenanceList: View {
     private func complete(_ reminder: MaintenanceReminder) {
         var nextMileage: Int?
         if let interval = reminder.repeatMiles {
-            guard let current = reminder.vehicle?.currentMileage else { error = "This schedule needs a vehicle before it can repeat."; return }
+            guard let current = reminder.vehicle?.estimatedMileage() else { error = "This schedule needs a vehicle before it can repeat."; return }
             let result = current.addingReportingOverflow(interval)
             guard !result.overflow else { error = "The next mileage is too large."; return }
             nextMileage = result.partialValue

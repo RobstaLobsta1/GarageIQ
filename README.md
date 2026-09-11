@@ -144,3 +144,15 @@ Mark Complete requires confirmation. For a one-time service, it sets completed=t
 The existing SwiftData model adds optional repeatMonths and repeatMiles fields, defaulting to nil for existing schedules. Saves are explicit, with rollback and error feedback. Verify migration with an existing store before shipping; no existing store was deleted or recreated.
 
 Validation performed: Swift syntax parsing, Xcode project plist validation, and whitespace checks passed. Full SwiftData compilation, UI testing, and migration testing remain pending under the documented sandbox limitation. Simulator checks: create date-only, mileage-only, and combined schedules; reject blank titles/invalid numbers/no deadlines; verify empty Garage guidance; confirm repeating completion advances both deadlines, one-time completion hides the item, cancellation preserves it, and delete persists after relaunch. Verify the dashboard card updates alongside the full schedule list.
+
+## Driving profiles and mileage estimates
+
+In Garage's add/edit vehicle form, enable automatic mileage estimates, select a use (commuting, school, work/deliveries, errands/family, leisure/trips, or mixed), and enter total typical miles per week or month. Include all travel in that total; the use label does not introduce an unsupported multiplier. Dashboard shows estimated odometer mileage and equivalent weekly/monthly driving for each enabled vehicle.
+
+Estimates accrue linearly from a dated baseline using elapsed time: weekly miles / 7 or monthly miles / 30.4375 per day. They are calculated when displayed, so no background task is needed and elapsed time while the app is closed is included. A minute timeline refreshes Dashboard and Garage estimates. Confirmed currentMileage remains untouched. Profile rate changes preserve accrued estimated distance before applying the new rate. A corrected odometer, or explicit confirmation of today's unchanged reading, resets the baseline. Disabling estimates returns displays to confirmed mileage.
+
+Mileage-based schedules use estimated mileage when enabled, show a projected due date, and renew from estimated mileage on completion. Zero driving yields no future mileage date. Estimates are planning aids, not actual telemetry; actual service history remains manually recorded. No location, tracking, or AI API is used.
+
+The Vehicle model adds optional driving profile, estimate baseline, and odometer-confirmation fields. Existing vehicles remain opted out. Verify migration with an existing store before release.
+
+Standalone tests of the production calculation/form code (with SwiftData annotations removed for execution) passed for weekly/monthly accrual, confirmed-mileage preservation, dates before the baseline, zero driving, profile changes, odometer corrections, and invalid profile input. Swift syntax checks passed. Full iOS compilation, migration and UI testing still require Xcode outside the documented agent sandbox limitation.

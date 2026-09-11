@@ -7,6 +7,6 @@ struct GarageIQApp: App {
         WindowGroup {
             MainTabView()
         }
-        .modelContainer(for: [Vehicle.self, MaintenanceRecord.self, MaintenanceReminder.self])
+        .modelContainer(for: [Vehicle.self, MaintenanceRecord.self, MaintenanceReminder.self, ChatConversation.self])
     }
 }
