@@ -66,8 +66,16 @@ struct VehicleProposal: Codable {
     var repeatMonths: Int? = nil
     var repeatMiles: Int? = nil
 
-    var scheduledDate: Date? {
-        guard let dueDate else { return nil }
+    var serviceDate: String? = nil
+    var serviceMileage: Int? = nil
+    var serviceCost: String? = nil
+    var shopName: String? = nil
+
+    var recordedDate: Date? { parsedDate(serviceDate) }
+    var scheduledDate: Date? { parsedDate(dueDate) }
+
+    private func parsedDate(_ value: String?) -> Date? {
+        guard let dueDate = value else { return nil }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -78,6 +86,16 @@ struct VehicleProposal: Codable {
     }
 
     var fields: [(String, String)] {
+        if operation == "record" {
+            var rows: [(String, String)] = []
+            if let serviceTitle { rows.append(("Service", serviceTitle)) }
+            if let serviceDate { rows.append(("Service date", serviceDate)) }
+            if let serviceMileage { rows.append(("Service odometer", "\(serviceMileage) miles")) }
+            rows.append(("Cost", serviceCost.map { "$\($0)" } ?? "Unknown"))
+            if let shopName, !shopName.isEmpty { rows.append(("Shop", shopName)) }
+            if let notes, !notes.isEmpty { rows.append(("Notes", notes)) }
+            return rows
+        }
         if operation == "schedule" {
             var rows: [(String, String)] = []
             if let serviceTitle { rows.append(("Service", serviceTitle)) }
@@ -96,6 +114,19 @@ struct VehicleProposal: Codable {
     }
 
     var isValid: Bool {
+        if operation == "record" {
+            guard vehicleID.flatMap(UUID.init(uuidString:)) != nil,
+                  let serviceTitle, !serviceTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  serviceTitle.count <= 500, recordedDate != nil,
+                  let serviceMileage, (0...10000000).contains(serviceMileage),
+                  (shopName?.count ?? 0) <= 500, (notes?.count ?? 0) <= 500 else { return false }
+            if let serviceCost {
+                guard serviceCost.range(of: #"^[0-9]{1,12}(\.[0-9]{1,2})?$"#, options: .regularExpression) != nil,
+                      Decimal(string: serviceCost, locale: Locale(identifier: "en_US_POSIX")) != nil else { return false }
+            }
+            return dueDate == nil && dueMileage == nil && repeatMonths == nil && repeatMiles == nil && nickname == nil && year == nil && make == nil && model == nil && trim == nil && currentMileage == nil && vin == nil && licensePlate == nil && drivingPurpose == nil && drivingPeriod == nil && estimatedMilesPerPeriod == nil
+        }
+        guard serviceDate == nil && serviceMileage == nil && serviceCost == nil && shopName == nil else { return false }
         if operation == "schedule" {
             guard vehicleID.flatMap(UUID.init(uuidString:)) != nil,
                   let serviceTitle, !serviceTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,

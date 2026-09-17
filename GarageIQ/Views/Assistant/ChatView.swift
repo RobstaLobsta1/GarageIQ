@@ -79,7 +79,7 @@ struct ChatView: View {
 
     private func proposalCard(_ proposal: VehicleProposal, message: ChatMessage) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(proposal.operation == "schedule" ? "Schedule maintenance" : (proposal.operation == "delete" ? "Delete vehicle" : (proposal.operation == "add" ? "Add vehicle" : "Update vehicle"))).font(.headline)
+            Text(proposal.operation == "record" ? "Record completed service" : proposal.operation == "schedule" ? "Schedule maintenance" : (proposal.operation == "delete" ? "Delete vehicle" : (proposal.operation == "add" ? "Add vehicle" : "Update vehicle"))).font(.headline)
             if let target = message.proposalTarget {
                 Text(target)
             } else if let vehicle = vehicles.first(where: { $0.id.uuidString == proposal.vehicleID }) {
@@ -99,11 +99,11 @@ struct ChatView: View {
                     if proposal.operation == "delete" {
                         Button("Delete vehicle…", role: .destructive) { deletionMessageID = message.id }.buttonStyle(.bordered)
                     } else {
-                        Button(proposal.operation == "schedule" ? "Save schedule" : "Save vehicle") { resolve(message.id, save: true) }.buttonStyle(.borderedProminent)
+                        Button(proposal.operation == "record" ? "Save service" : proposal.operation == "schedule" ? "Save schedule" : "Save vehicle") { resolve(message.id, save: true) }.buttonStyle(.borderedProminent)
                     }
                     Button("Dismiss") { resolve(message.id, save: false) }.buttonStyle(.bordered)
                 }.disabled(busy)
-            } else { Text(message.proposalStatus == "saved" ? (proposal.operation == "delete" ? "Vehicle deleted" : (proposal.operation == "schedule" ? "Schedule saved" : "Saved to your garage")) : "Dismissed").font(.caption) }
+            } else { Text(message.proposalStatus == "saved" ? (proposal.operation == "delete" ? "Vehicle deleted" : (proposal.operation == "record" ? "Service saved" : proposal.operation == "schedule" ? "Schedule saved" : "Saved to your garage")) : "Dismissed").font(.caption) }
         }.padding().background(Color.blue.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
     }
 
@@ -133,7 +133,15 @@ struct ChatView: View {
                     }
                     vehicle = existing
                 }
-                if proposal.operation == "schedule" {
+                if proposal.operation == "record" {
+                    let record = MaintenanceRecord(vehicle: vehicle,
+                        serviceType: proposal.serviceTitle!.trimmingCharacters(in: .whitespacesAndNewlines),
+                        date: proposal.recordedDate!, mileage: proposal.serviceMileage!,
+                        cost: proposal.serviceCost.flatMap { Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")) },
+                        shopName: (proposal.shopName ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+                        notes: (proposal.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+                    context.insert(record)
+                } else if proposal.operation == "schedule" {
                     let reminder = MaintenanceReminder(vehicle: vehicle, title: proposal.serviceTitle!.trimmingCharacters(in: .whitespacesAndNewlines), dueDate: proposal.scheduledDate, dueMileage: proposal.dueMileage, notes: proposal.notes ?? "")
                     reminder.repeatMonths = proposal.repeatMonths
                     reminder.repeatMiles = proposal.repeatMiles
@@ -216,13 +224,13 @@ struct ChatView: View {
                 if let proposal = message.proposal {
                     content += "\nProposed fields: " + proposal.fields.map { "\($0.0): \($0.1)" }.joined(separator: "; ")
                 }
-                if let status = message.proposalStatus { content += "\nVehicle proposal status: \(status)" }
+                if let status = message.proposalStatus { content += "\nProposal status: \(status)" }
                 return ["role": message.role, "content": content]
             }
-            let payload = try JSONSerialization.data(withJSONObject: ["supportsScheduling": true, "supportsVehicleDeletion": true, "supportsVehicleChanges": true, "vehicleContext": snapshot, "messages": history])
+            let payload = try JSONSerialization.data(withJSONObject: ["supportsServiceRecords": true, "supportsScheduling": true, "supportsVehicleDeletion": true, "supportsVehicleChanges": true, "vehicleContext": snapshot, "messages": history])
             try await ChatService(endpoint: url).stream(payload: payload, onDelta: { partial += $0 }, onProposal: { receivedProposal = $0 })
             try Task.checkCancellation()
-            if partial.isEmpty && receivedProposal != nil { partial = "Review this vehicle change below. It has not been saved yet." }
+            if partial.isEmpty && receivedProposal != nil { partial = "Review this proposed change below. It has not been saved yet." }
             guard !partial.isEmpty else { throw NSError(domain: "Chat", code: 0, userInfo: [NSLocalizedDescriptionKey: "No reply received. Retry."]) }
             let completed = next + [ChatMessage(role: "assistant", content: partial, proposal: receivedProposal, proposalTarget: receivedProposal.flatMap { p in vehicles.first { $0.id.uuidString == p.vehicleID }.map { "\($0.nickname) \(String($0.year)) \($0.make) \($0.model)" } }, vehicleBaseline: receivedProposal.flatMap { p in p.vehicleID.flatMap { baselines[$0] } }, proposalStatus: receivedProposal == nil ? nil : "pending")]
             let saved = conversation ?? ChatConversation()

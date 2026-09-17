@@ -156,3 +156,7 @@ Mileage-based schedules use estimated mileage when enabled, show a projected due
 The Vehicle model adds optional driving profile, estimate baseline, and odometer-confirmation fields. Existing vehicles remain opted out. Verify migration with an existing store before release.
 
 Standalone tests of the production calculation/form code (with SwiftData annotations removed for execution) passed for weekly/monthly accrual, confirmed-mileage preservation, dates before the baseline, zero driving, profile changes, odometer corrections, and invalid profile input. Swift syntax checks passed. Full iOS compilation, migration and UI testing still require Xcode outside the documented agent sandbox limitation.
+
+## Chat: past service records
+
+Chat can now propose a past service record for a saved vehicle. Provide the service type, actual service date, and historical odometer; cost, shop, and notes are optional. Review the card and tap Save service to add it to Maintenance history. The record and proposal status save together, so the same proposal cannot be saved twice. This does not change the vehicle odometer or complete a scheduled reminder. The separate GarageIQ-API backend must also be updated; the legacy Backend folder does not implement this capability.
