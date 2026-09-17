@@ -1,162 +1,91 @@
-# GarageIQ — Vehicle and Maintenance Management
+# GarageIQ
 
-Native SwiftUI foundation for the CPSC 411 project. Targets iOS 17+, uses SwiftData, and has no third-party dependencies. The foundation, vehicle management, and maintenance records are implemented.
+CPSC 411 iOS project for managing vehicles, maintenance history, scheduled maintenance, and AI-assisted vehicle care. Built with Swift, SwiftUI, and SwiftData for iOS 17+, with no third-party iOS dependencies.
+
+## Current features
+
+- **Garage:** add, edit, and delete vehicles with nickname, year, make, model, trim, confirmed odometer, optional VIN and license plate. Deleting a vehicle also deletes its service records and reminders, while retaining chat history.
+- **Maintenance:** select a vehicle and add, edit, or delete service records. Each record stores service type, date, historical mileage, optional cost, shop, and notes. History sorts newest first; historical mileage does not change the current odometer.
+- **Reminders:** create date-based, mileage-based, or combined schedules with optional repeat intervals. Mark complete or delete after confirmation. These are in-app schedules; phone notifications are not implemented.
+- **Dashboard:** month-to-date maintenance costs across all vehicles, driving estimates, and up to three active schedules.
+- **Chat:** streamed AI replies, saved conversations, vehicle/garage analysis, and reviewed proposals to add, update, or delete vehicles, create reminders, and record past services.
 
 ## Open and build
 
-1. Open `GarageIQ.xcodeproj` with Xcode 15 or newer.
-2. Choose the GarageIQ scheme and an installed iPhone simulator.
-3. Press Command-B to build, then Command-R to run.
-4. Open Garage, add a vehicle, tap its row to edit, and swipe to edit or delete. Maintenance supports service records; Dashboard and Reminders remain placeholders.
+1. Open `GarageIQ.xcodeproj` in Xcode 15 or newer.
+2. Select the GarageIQ scheme and an installed iPhone simulator.
+3. Build with Command-B and run with Command-R.
+4. Add a vehicle in Garage or through a reviewed Chat proposal, then record maintenance and create schedules.
 
-For a device, set your signing team and a unique bundle identifier in the target's Signing & Capabilities settings. The current identifier is `com.example.GarageIQ`.
+For a physical device, select your signing team and a unique bundle identifier. The current project identifier is `com.example.GarageIQ`.
 
-Command-line build from this folder on a Mac with Xcode selected:
+From this repository root, with Xcode selected:
 
 ```sh
 xcodebuild -project GarageIQ.xcodeproj -scheme GarageIQ -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-Build status: NOT VERIFIED. Xcode 26.3 was located at `/Users/Robby/Downloads/Xcode.app`. A simulator build was attempted using an explicit `DEVELOPER_DIR`, but the agent sandbox blocked Swift macro plugin execution (`sandbox-exec: sandbox_apply: Operation not permitted`), causing SwiftData macro expansion failures. Simulator services were also unavailable in this environment. Run the build from Xcode to complete verification. The project plist, scheme XML, source membership, and file references were checked; these checks do not replace compilation. Complete the build and simulator checks below before proceeding. Persistence relaunch testing remains pending.
+The Debug simulator build succeeded during the latest service-record update. On-device behavior, persistence after relaunch, and migration of existing stores still require verification. Earlier sandbox-related compiler macro failures were resolved by running the verification build outside the agent sandbox.
 
-## Folder and file guide
+## Architecture
+
+`GarageIQApp` attaches one on-disk SwiftData container containing `Vehicle`, `MaintenanceRecord`, `MaintenanceReminder`, and `ChatConversation`. Views observe data through `@Query` and save using the environment model context. Saves are explicit, with rollback and error feedback.
+
+Vehicle and maintenance forms use value-type drafts for validation; Cancel leaves saved models untouched. Chat conversations store a Codable transcript as Data, including proposal fields and saved/dismissed status. Accepted proposals and their transcript status save together. Pending changes to an existing vehicle are rejected if the target was removed or its tracked fields changed after the proposal was generated.
 
 ```text
 GarageIQ/
-├── GarageIQ.xcodeproj/
-│   ├── project.pbxproj
-│   └── xcshareddata/xcschemes/GarageIQ.xcscheme
-├── GarageIQ/
-│   ├── App/GarageIQApp.swift
-│   ├── Models/
-│   │   ├── Vehicle.swift
-│   │   ├── MaintenanceRecord.swift
-│   │   └── MaintenanceReminder.swift
-│   ├── Views/
-│   │   ├── MainTabView.swift
-│   │   ├── Dashboard/DashboardView.swift
-│   │   ├── Maintenance/MaintenanceView.swift
-│   │   ├── Reminders/RemindersView.swift
-│   │   └── Garage/
-│   │       ├── GarageView.swift
-│   │       └── AddVehicleView.swift
-│   ├── ViewModels/VehicleFormData.swift
-│   ├── Services/.gitkeep
-│   ├── Utilities/.gitkeep
-│   └── Resources/Assets.xcassets/Contents.json
-├── .gitignore
-└── README.md
+├── App/                         App entry point and persistent container
+├── Models/                      Vehicles, records, reminders, conversations
+├── Views/
+│   ├── MainTabView.swift         Chat, Dashboard, Maintenance, Reminders, Garage
+│   ├── Assistant/               Chat and retained legacy analysis view
+│   ├── Dashboard/               Driving estimates, costs, upcoming schedules
+│   ├── Garage/                  Vehicle list and shared add/edit form
+│   ├── Maintenance/             Vehicle selection, history, service form
+│   └── Reminders/               Schedule form and active schedule list
+├── ViewModels/                  Form drafts and monthly cost calculation
+├── Services/                    Streaming chat, analysis, Keychain sessions
+└── Resources/                   Asset catalog
 ```
 
-- **GarageIQApp.swift** is the entry point. It creates the main window and attaches one on-disk SwiftData container containing all three model types. Descendant views can later access its model context to save and query data.
-- **Vehicle.swift** stores vehicle identity, specifications, mileage, optional VIN and plate, creation date, and relationships to records and reminders.
-- **MaintenanceRecord.swift** stores service type, service date, mileage, optional cost, shop, notes, and its vehicle relationship. `Decimal?` distinguishes an unknown cost from zero without binary floating-point currency arithmetic. Receipt support is deferred.
-- **MaintenanceReminder.swift** stores title, optional due date and mileage, notes, completion state, notification preference, and vehicle relationship. Notifications default to disabled; no permission request or scheduling occurs.
-- **MainTabView.swift** assembles the four tabs with SF Symbols. Each screen owns a NavigationStack for future navigation.
-- **DashboardView.swift** shows the overview placeholder.
-- **MaintenanceView.swift** selects the vehicle whose history is displayed.
-- **MaintenanceHistoryView.swift** queries records for that vehicle, sorts by service date descending, and offers add/edit/delete actions.
-- **AddMaintenanceRecordView.swift** displays all service fields in a shared add/edit form.
-- **MaintenanceFormData.swift** keeps draft fields separate from persistence and validates mileage, cost, and service type.
-- **RemindersView.swift** shows the reminders placeholder.
-- **GarageView.swift** fetches all saved vehicles, displays them newest-added first, opens add/edit sheets, and confirms deletion.
-- **AddVehicleView.swift** shares one form for adding and editing, validates on Save, and reports persistence failures.
-- **VehicleFormData.swift** holds a temporary value-type draft, validates required fields and numeric ranges, and applies valid changes to a model.
-- **ViewModels, Services, Utilities** are reserved folders. Their `.gitkeep` files preserve empty directories. VehicleFormData separates form state and validation from the Garage views.
-- **Assets.xcassets/Contents.json** starts the asset catalog. App icons can be added before distribution.
-- **project.pbxproj** defines the native iOS app target and its source files, resources, and Debug/Release settings. The shared **GarageIQ.xcscheme** supports build and run without a project generator.
-- **.gitignore** excludes local Xcode state and build output.
+## Maintenance and driving behavior
 
-## Swift concepts to understand
+Service type and a nonnegative whole-number mileage are required. Blank cost means unknown; zero means a known free service. Costs use Decimal, with up to twelve whole digits and two fractional digits, and are displayed as dollars. Receipt attachments are not implemented.
 
-- `struct ...: View` describes a lightweight SwiftUI view. Its `body: some View` returns a concrete view composition while hiding that composition's long type name.
-- `@main` identifies the app entry point. `WindowGroup` hosts its interface.
-- `@Model` is a macro that adds SwiftData persistence and observation to a class. Models use reference semantics, so relationships refer to model objects rather than copied structs.
-- `@Attribute(.unique)` makes the UUID an app-level unique identifier.
-- `@Relationship` explicitly describes the inverse association. A vehicle has many records/reminders; each child points back to a vehicle. Cascade deletion means deleting a vehicle also deletes its children. Deleting a child does not delete the vehicle.
-- A type ending in `?` is optional: it can contain a value or `nil`. Child relationships are optional for persistence lifecycle handling, but the initializers require a vehicle when creating a child.
-- `init` assigns initial values. Default arguments let callers omit values such as empty notes or today's date.
-- `.modelContainer(for:)` sets up storage and makes a model context available through the SwiftUI environment. Later phases can use `@Query` to fetch models and `@Environment(\.modelContext)` for mutations.
-- `#Preview` provides an Xcode canvas preview. Garage, the editor, and main-tab previews use an in-memory model container so previews do not affect saved app data.
+Driving estimates are optional. Enter total typical weekly or monthly miles in Garage; estimates accrue from a dated baseline using miles / 7 or miles / 30.4375 per day. Confirmed mileage stays separate. Manual profile-rate changes preserve accrued estimated distance, while an odometer correction or confirmation resets the baseline. Estimates require no location tracking or background task.
 
-Model initializers only initialize data. The vehicle editor now validates trimmed make/model, year from 1900 through current year + 1, and whole-number mileage of at least zero. Blank VIN and plate become nil. Editing can correct mileage downward; the separate dashboard mileage-update action is not implemented. Maintenance record management is implemented as described below. Reminder and AI behavior remain deferred.
+Mileage schedules use estimated mileage when enabled, otherwise confirmed mileage. A combined schedule means whichever deadline comes first. Completing a one-time schedule hides it. Repeating deadlines advance from completion time and the current estimated or confirmed mileage; nonrepeating dimensions are cleared. Completion does not create a service record—record actual work separately.
 
-## SwiftData operations in vehicle management
+## AI backend
 
-- `@Query(sort: \Vehicle.dateAdded, order: .reverse)` fetches vehicles and keeps the list up to date with model changes.
-- `@Environment(\.modelContext)` uses the context from the app's existing on-disk container.
-- `insert` registers a new vehicle. Editing assigns fields on the existing model; no duplicate is inserted and its ID/dateAdded stay intact.
-- `save()` explicitly persists additions, edits, and deletions and allows errors to be displayed before dismissing the editor.
-- `delete` marks a vehicle for deletion. The existing cascade relationships also delete related records and reminders after saving.
-- `rollback()` discards pending context changes if saving fails. Garage and Maintenance use synchronous save operations; revisit context isolation when adding concurrent editing flows in later phases.
-- Cancel discards the form draft without ever changing the persisted model.
+The active backend is the separate [GarageIQ-API repository](https://github.com/RobstaLobsta1/GarageIQ-API), intended for Render hosting. The app currently points to `https://garageiq-api.onrender.com` for chat, analysis, and anonymous session issuance. Session tokens are stored in Keychain; the OpenAI key and session-signing secret stay on the backend. The GPT model is selected by Render's `OPENAI_MODEL` environment variable, not by the iOS app. Its deployed value is not confirmed by this repository.
 
-## Simulator verification checklist (not yet run)
+The `Backend/` folder is an older local development implementation. It uses a development-token authentication flow and does not implement the current reviewed actions; use GarageIQ-API for the current app. Changing a chat endpoint alone does not redirect session issuance, which remains hardcoded to Render.
 
-1. Start with an empty store: verify the empty state and toolbar Add button.
-2. Add two vehicles with different values in all fields. Verify both rows and their mileage.
-3. Submit empty and whitespace-only make/model; verify inline errors and no saved vehicle.
-4. Test years 1899, 1900, current year + 1, and current year + 2. Only the middle two are accepted.
-5. Test blank, negative, decimal, alphabetic, and excessively large mileage text. Reject these; accept zero and positive whole numbers.
-6. Reopen a saved vehicle: verify all eight fields. Save changes, including a lower mileage correction; verify no duplicate row.
-7. Edit fields and Cancel or swipe down the sheet; verify the saved data is unchanged.
-8. Leave VIN and plate blank and save; reopen to verify they remain blank.
-9. Swipe Delete and cancel; verify the row remains. Confirm deletion; verify only the selected vehicle disappears.
-10. Force-quit and relaunch: verify additions and edits persist and deleted vehicles stay deleted.
-11. Confirm Dashboard and Reminders still show their existing placeholders.
+Sending chat shares the conversation and a snapshot of all saved vehicles' specifications, confirmed/estimated mileage, driving profiles, service dates/types/mileages, and active schedule deadlines. Saved VIN, plate, costs, shops, and notes are excluded from the snapshot. Text typed in chat and fields contained in past proposals can still be included in the conversation sent to the backend and OpenAI.
 
-Apple reference: [ModelContext](https://developer.apple.com/documentation/swiftdata/modelcontext).
+The assistant gives direct general maintenance explanations and typical intervals with assumptions. Manufacturer-specific requirements remain unverified unless a source is supplied; manufacturer reference retrieval is not implemented. Maintenance documentation is distinct from mechanical condition, and the assistant cannot certify roadworthiness. Advice does not authorize saved changes.
 
-## Maintenance records
+### Past service records through Chat
 
-Select a vehicle at the top of Maintenance. Add Service records a service for that vehicle; its association is shown in the form and retained when editing. Tap a history row to view/edit all fields, or swipe for Edit/Delete. The list sorts by service date descending. Deletion requires confirmation and removes only the record. If no vehicles exist, the tab directs the user to Garage.
+Example: “Record an oil change for my Civic on March 12, 2025 at 45,000 miles, costing $89.95.”
 
-The filtered `@Query` matches `record.vehicle?.id` to the selected vehicle's ID. Changing vehicles rebuilds the history query. New records use `MaintenanceRecord(vehicle: ...)` and `insert`; updates assign fields on the existing record. Both Save and Delete explicitly call `modelContext.save()` and report failures with rollback. Cancel discards the draft. Historical service mileage does not alter the vehicle's odometer.
+The assistant gathers the target vehicle, service type, actual date, and historical odometer. Cost, shop, and notes are optional. Review the card and tap **Save service** or **Dismiss**. Saving adds a maintenance record without changing the vehicle odometer or completing a reminder. Saved or dismissed proposals cannot be applied again. Existing records can be edited or deleted in Maintenance; those operations are not available through Chat.
 
-Service type is required and accepts custom text. Mileage must be a nonnegative integer. Blank cost is nil (unknown), while zero is a known free service. Cost uses Decimal and requires a decimal point, up to two fractional digits, and at most twelve whole digits. Shop and notes may be blank. No notifications, receipt support, or AI functionality is added.
+Both the updated API and a rebuilt iOS app are needed for this action. Backend instruction-only updates require an API deployment but no app rebuild.
 
-Maintenance verification:
+## Verification and remaining work
 
-- Swift syntax parsing, project file validation, source membership, and whitespace checks passed.
-- Full SwiftUI/SwiftData compilation and simulator persistence testing remain pending because this session blocks Xcode's macro plugin sandbox (see build status above).
-- In Simulator, create two vehicles and add different services for each; switch between them and confirm records do not leak across vehicles.
-- Add records out of date order; confirm newest service dates appear first. Change a service date while editing and confirm the order updates.
-- Edit each field, save, and reopen. Cancel a later edit and confirm saved values remain unchanged.
-- Test blank service type, negative/nonnumeric mileage, and invalid cost; verify no record is created. Verify blank cost and zero cost are distinct.
-- Cancel deletion, then confirm it; verify the vehicle and its other records remain. Relaunch and verify additions, edits, and deletions persist.
+The latest Debug simulator build passed. The backend's 12 automated tests passed; three tests in the legacy backend also passed. Provider requests are mocked, so these checks do not establish live AI answer quality or end-to-end saving behavior.
 
-## Dashboard: monthly maintenance costs
+Manual verification should cover:
 
-Dashboard now contains one card for the current calendar month's maintenance costs through the current time, across all vehicles. It uses service dates, excludes future-dated records, sums Decimal costs, and distinguishes unknown costs from known zero costs. The card displays the month, total, service count, and count of records without costs. Amounts are displayed with a dollar sign and two decimal places; totals assume all entered costs are in dollars.
+- Vehicle and service add/edit/delete, form validation, cancellation, cascade deletion, and persistence after relaunch.
+- Date-only, mileage-only, and combined schedules; recurrence, completion, deletion, and existing-store migration.
+- Mileage accrual, rate changes, odometer corrections, zero driving, and month-to-date cost updates.
+- Chat streaming, Stop/retry, saved conversations, proposal dismissal, stale targets, and saving each proposal once.
+- Past-service proposals with missing details, ambiguous vehicles, unknown versus zero costs, and history after relaunch.
+- Direct routine guidance, uncertain manufacturer specifications, sparse history, and relevant safety symptoms using real provider replies.
 
-`DashboardView` observes records with `@Query`, so additions, edits, and deletions update the total. `MonthlyMaintenanceSummary` contains the calculation, and `MonthlyMaintenanceCostCard` renders it. A periodic timeline refreshes the date while the screen is open, including month rollover. No new model fields or data migrations are needed.
-
-Verification: calculation tests cover exact decimal sums, missing versus zero cost, empty history, start-of-month inclusion, prior-month and future exclusion, and month rollover. Swift syntax and project plist checks passed. Full iOS build and visual verification remain pending under the previously documented environment limitation. On device, add/edit/delete a service dated this month and confirm the card updates; services from other months should not contribute.
-
-## Scheduled maintenance
-
-Dashboard now shows up to three active schedules and a Schedule Service button. The Reminders tab shows all active schedules and the same creation form. Choose a saved vehicle, title, first due date and/or odometer reading, optional repeat interval in months and/or miles, and notes. Both deadlines mean whichever comes first. No notification permission or local notification scheduling is implemented.
-
-Dates and mileage are separate deadlines. A mileage deadline displays distance remaining based on the vehicle's stored odometer. A past date is highlighted; reached mileage is highlighted. Blank repeat intervals mean one-time maintenance. Months must be 1–1200 and repeat miles 1–10,000,000; due mileage must be a nonnegative whole number.
-
-Mark Complete requires confirmation. For a one-time service, it sets completed=true and hides the schedule. For repeat schedules, it sets the next date to today plus the month interval and next mileage to current vehicle mileage plus the mile interval. Nonrepeating deadlines are cleared on renewal. Update the Garage odometer before completion. Schedule completion does not add a maintenance record or affect the monthly cost total; record actual work separately in Maintenance. Delete removes the schedule after confirmation.
-
-The existing SwiftData model adds optional repeatMonths and repeatMiles fields, defaulting to nil for existing schedules. Saves are explicit, with rollback and error feedback. Verify migration with an existing store before shipping; no existing store was deleted or recreated.
-
-Validation performed: Swift syntax parsing, Xcode project plist validation, and whitespace checks passed. Full SwiftData compilation, UI testing, and migration testing remain pending under the documented sandbox limitation. Simulator checks: create date-only, mileage-only, and combined schedules; reject blank titles/invalid numbers/no deadlines; verify empty Garage guidance; confirm repeating completion advances both deadlines, one-time completion hides the item, cancellation preserves it, and delete persists after relaunch. Verify the dashboard card updates alongside the full schedule list.
-
-## Driving profiles and mileage estimates
-
-In Garage's add/edit vehicle form, enable automatic mileage estimates, select a use (commuting, school, work/deliveries, errands/family, leisure/trips, or mixed), and enter total typical miles per week or month. Include all travel in that total; the use label does not introduce an unsupported multiplier. Dashboard shows estimated odometer mileage and equivalent weekly/monthly driving for each enabled vehicle.
-
-Estimates accrue linearly from a dated baseline using elapsed time: weekly miles / 7 or monthly miles / 30.4375 per day. They are calculated when displayed, so no background task is needed and elapsed time while the app is closed is included. A minute timeline refreshes Dashboard and Garage estimates. Confirmed currentMileage remains untouched. Profile rate changes preserve accrued estimated distance before applying the new rate. A corrected odometer, or explicit confirmation of today's unchanged reading, resets the baseline. Disabling estimates returns displays to confirmed mileage.
-
-Mileage-based schedules use estimated mileage when enabled, show a projected due date, and renew from estimated mileage on completion. Zero driving yields no future mileage date. Estimates are planning aids, not actual telemetry; actual service history remains manually recorded. No location, tracking, or AI API is used.
-
-The Vehicle model adds optional driving profile, estimate baseline, and odometer-confirmation fields. Existing vehicles remain opted out. Verify migration with an existing store before release.
-
-Standalone tests of the production calculation/form code (with SwiftData annotations removed for execution) passed for weekly/monthly accrual, confirmed-mileage preservation, dates before the baseline, zero driving, profile changes, odometer corrections, and invalid profile input. Swift syntax checks passed. Full iOS compilation, migration and UI testing still require Xcode outside the documented agent sandbox limitation.
-
-## Chat: past service records
-
-Chat can now propose a past service record for a saved vehicle. Provide the service type, actual service date, and historical odometer; cost, shop, and notes are optional. Review the card and tap Save service to add it to Maintenance history. The record and proposal status save together, so the same proposal cannot be saved twice. This does not change the vehicle odometer or complete a scheduled reminder. The separate GarageIQ-API backend must also be updated; the legacy Backend folder does not implement this capability.
+Next work includes schedule editing, a completion flow that records actual maintenance, local notifications, iOS test coverage, and migration verification. Public backend use also needs stronger identity and persistent quota controls. Deployment completion has not been verified in this repository.
