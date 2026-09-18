@@ -32,7 +32,12 @@ struct MaintenanceView: View {
                     ContentUnavailableView("Add a Vehicle First", systemImage: "car", description: Text("Open Garage to add a vehicle before recording maintenance."))
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(GarageTheme.background)
+            .toolbarBackground(GarageTheme.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle("Maintenance")
+            .appearanceSettings()
         }
     }
 }

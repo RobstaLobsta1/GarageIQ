@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct ChatView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.modelContext) private var context
     @Query private var vehicles: [Vehicle]
     @Query(sort: \ChatConversation.createdAt, order: .reverse) private var conversations: [ChatConversation]
@@ -52,12 +53,24 @@ struct ChatView: View {
                 .onChange(of: messages.count) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             }
             HStack {
-                TextField("Tell me about your vehicles", text: $draft, axis: .vertical).lineLimit(1...5).textFieldStyle(.roundedBorder).disabled(busy)
+                TextField("Tell me about your vehicles", text: $draft, axis: .vertical)
+                    .lineLimit(1...5)
+                    .textFieldStyle(.plain)
+                    .padding(12)
+                    .background(GarageTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(GarageTheme.border, lineWidth: 1))
+                    .disabled(busy)
                 if busy { Button("Stop") { task?.cancel() } }
                 else { Button("Send") { task = Task { await send() } }.disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
             }.padding()
+                .background(GarageTheme.chrome)
         }
+        .scrollContentBackground(.hidden)
+        .background(GarageTheme.background)
+        .toolbarBackground(GarageTheme.chrome, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationTitle("GarageIQ Chat")
+        .appearanceSettings()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             Menu {
@@ -105,7 +118,9 @@ struct ChatView: View {
                     Button("Dismiss") { resolve(message.id, save: false) }.buttonStyle(.bordered)
                 }.disabled(busy)
             } else { Text(message.proposalStatus == "saved" ? (proposal.operation == "delete" ? "Vehicle deleted" : (proposal.operation == "record" ? "Service saved" : proposal.operation == "schedule" ? "Schedule saved" : "Saved to your garage")) : "Dismissed").font(.caption) }
-        }.padding().background(Color.blue.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+        }.padding()
+            .background(GarageTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(GarageTheme.border, lineWidth: 1))
     }
 
     private func fingerprint(_ vehicle: Vehicle) -> String {
@@ -186,7 +201,8 @@ struct ChatView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: user ? .trailing : .leading)
-        .background(user ? Color.blue.opacity(0.12) : Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+        .background(colorScheme == .dark ? (user ? GarageTheme.userBubble : GarageTheme.surface) : (user ? Color.blue.opacity(0.12) : Color.secondary.opacity(0.08)), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(GarageTheme.border.opacity(colorScheme == .dark ? 1 : 0.35), lineWidth: 1))
     }
 
     private func load(_ chat: ChatConversation) {

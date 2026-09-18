@@ -63,6 +63,10 @@ struct AddVehicleView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(GarageTheme.background)
+            .toolbarBackground(GarageTheme.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle(vehicle == nil ? "Add Vehicle" : "Edit Vehicle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

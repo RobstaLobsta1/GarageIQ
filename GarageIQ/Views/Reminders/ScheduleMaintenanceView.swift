@@ -46,6 +46,10 @@ struct ScheduleMaintenanceView: View {
                 Section("Notes") { TextField("Notes", text: $notes, axis: .vertical) }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
+            .scrollContentBackground(.hidden)
+            .background(GarageTheme.background)
+            .toolbarBackground(GarageTheme.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle("Schedule Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

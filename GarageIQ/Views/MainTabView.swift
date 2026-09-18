@@ -15,6 +15,9 @@ struct MainTabView: View {
             GarageView()
                 .tabItem { Label("Garage", systemImage: "car") }
         }
+        .tint(GarageTheme.accent)
+        .toolbarBackground(GarageTheme.chrome, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
     }
 }
 

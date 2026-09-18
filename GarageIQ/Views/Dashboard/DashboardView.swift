@@ -33,7 +33,7 @@ struct DashboardView: View {
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 20))
+                    .background(GarageTheme.surface, in: RoundedRectangle(cornerRadius: 20))
                     MonthlyMaintenanceCostCard(
                         summary: MonthlyMaintenanceSummary(records: maintenanceRecords, now: context.date),
                         date: context.date
@@ -46,13 +46,18 @@ struct DashboardView: View {
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 20))
+                    .background(GarageTheme.surface, in: RoundedRectangle(cornerRadius: 20))
                     }
                 }
                 .padding()
             }
-            .background(Color(.systemGroupedBackground))
+            .background(GarageTheme.background)
+            .scrollContentBackground(.hidden)
+            .background(GarageTheme.background)
+            .toolbarBackground(GarageTheme.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle("Dashboard")
+            .appearanceSettings()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     NavigationLink { ChatView() } label: { Label("Assistant", systemImage: "sparkles") }

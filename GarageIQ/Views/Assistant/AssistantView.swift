@@ -59,6 +59,10 @@ struct AssistantView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(GarageTheme.background)
+        .toolbarBackground(GarageTheme.chrome, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationTitle("GarageIQ Assistant")
         .onAppear { if selectedID == nil { selectedID = vehicles.first?.id } }
         .onChange(of: selectedID) { _, _ in result = nil; applied = false; error = nil }

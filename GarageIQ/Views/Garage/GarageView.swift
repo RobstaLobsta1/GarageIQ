@@ -36,6 +36,7 @@ struct GarageView: View {
                         }
                         .foregroundStyle(.primary)
                     }
+                    .listRowBackground(GarageTheme.surface)
                     .accessibilityHint("Edit vehicle")
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button("Delete", role: .destructive) { vehicleToDelete = vehicle }
@@ -56,7 +57,12 @@ struct GarageView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(GarageTheme.background)
+            .toolbarBackground(GarageTheme.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle("Garage")
+            .appearanceSettings()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add Vehicle", systemImage: "plus") { showingAddVehicle = true }

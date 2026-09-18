@@ -39,6 +39,7 @@ struct MaintenanceHistoryView: View {
                     .font(.subheadline)
                     .foregroundStyle(.primary)
                 }
+                .listRowBackground(GarageTheme.surface)
                 .accessibilityHint("View and edit service details")
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button("Delete", role: .destructive) { recordToDelete = record }

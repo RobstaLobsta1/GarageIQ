@@ -16,7 +16,7 @@ struct MonthlyMaintenanceCostCard: View {
                 Spacer()
                 Image(systemName: "wrench.and.screwdriver")
                     .font(.title2)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(GarageTheme.accent)
                     .accessibilityHidden(true)
             }
 
@@ -48,7 +48,7 @@ struct MonthlyMaintenanceCostCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+        .background(GarageTheme.surface, in: RoundedRectangle(cornerRadius: 20))
         .accessibilityElement(children: .contain)
     }
 }

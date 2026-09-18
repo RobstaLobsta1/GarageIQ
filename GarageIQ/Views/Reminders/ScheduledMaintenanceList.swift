@@ -51,6 +51,7 @@ struct ScheduledMaintenanceList: View {
                 Text("View all \(reminders.count) schedules in Reminders.").font(.caption).foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .confirmationDialog("Complete this scheduled service?", isPresented: Binding(get: { pendingCompletion != nil }, set: { if !$0 { pendingCompletion = nil } }), titleVisibility: .visible) {
             Button("Mark Complete") { if let reminder = pendingCompletion { complete(reminder) }; pendingCompletion = nil }
             Button("Cancel", role: .cancel) { pendingCompletion = nil }

@@ -48,6 +48,10 @@ struct AddMaintenanceRecordView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(GarageTheme.background)
+            .toolbarBackground(GarageTheme.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle(record == nil ? "Add Service" : "Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -12,6 +12,8 @@ CPSC 411 iOS project for managing vehicles, maintenance history, scheduled maint
 
 The Chat navigation title stays fixed while you scroll through the conversation, keeping the screen title visible above your messages.
 
+GarageIQ uses a charcoal dark appearance across every screen, with lavender accents. **Settings** (the gear icon on every main tab) shows the active Dark appearance.
+
 ## Open and build
 
 1. Open `GarageIQ.xcodeproj` in Xcode 15 or newer.
@@ -29,6 +31,8 @@ xcodebuild -project GarageIQ.xcodeproj -scheme GarageIQ -configuration Debug -sd
 
 The Debug simulator build succeeded during the latest service-record update. On-device behavior, persistence after relaunch, and migration of existing stores still require verification. Earlier sandbox-related compiler macro failures were resolved by running the verification build outside the agent sandbox.
 
+The native launch screen displays the GarageIQ brand on a charcoal background while iOS starts the app. A matching SwiftUI startup animation then slides the G in from the left, the Q from the right, and bounces the I down from the top above the Q before revealing the app. The animation runs once per UI startup, lasts about two seconds, and is skipped when Reduce Motion is enabled.
+
 ## Architecture
 
 `GarageIQApp` attaches one on-disk SwiftData container containing `Vehicle`, `MaintenanceRecord`, `MaintenanceReminder`, and `ChatConversation`. Views observe data through `@Query` and save using the environment model context. Saves are explicit, with rollback and error feedback.
@@ -45,11 +49,15 @@ GarageIQ/
 │   ├── Dashboard/               Driving estimates, costs, upcoming schedules
 │   ├── Garage/                  Vehicle list and shared add/edit form
 │   ├── Maintenance/             Vehicle selection, history, service form
-│   └── Reminders/               Schedule form and active schedule list
+│   ├── Reminders/               Schedule form and active schedule list
+│   └── Settings/                Appearance settings and shared gear modifier
 ├── ViewModels/                  Form drafts and monthly cost calculation
 ├── Services/                    Streaming chat, analysis, Keychain sessions
-└── Resources/                   Asset catalog
+├── Utilities/                   Shared adaptive theme colors
+└── Resources/                   App icon, logo assets, and launch storyboard
 ```
+
+Xcode’s project navigator mirrors these folders. Settings and theme colors have their own files; MainTabView contains tab navigation only. The legacy backend is listed separately from the app source.
 
 ## Maintenance and driving behavior
 
