@@ -10,7 +10,7 @@ CPSC 411 iOS project for managing vehicles, maintenance history, scheduled maint
 - **Dashboard:** month-to-date maintenance costs across all vehicles, driving estimates, and up to three active schedules.
 - **Chat:** streamed AI replies, saved conversations, vehicle/garage analysis, and reviewed proposals to add, update, or delete vehicles, create reminders, and record past services.
 
-The Chat navigation title stays fixed while you scroll through the conversation.
+The Chat navigation title stays fixed while you scroll through the conversation, keeping the screen title visible above your messages.
 
 ## Open and build
 
