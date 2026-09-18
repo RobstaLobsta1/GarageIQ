@@ -58,6 +58,7 @@ struct ChatView: View {
             }.padding()
         }
         .navigationTitle("GarageIQ Chat")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             Menu {
                 Button("Analyze my garage") { draft = "Analyze the maintenance records for every vehicle in my garage. What needs attention, and what information is missing?" }
