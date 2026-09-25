@@ -40,7 +40,10 @@ struct ScheduledMaintenanceList: View {
                     if let miles = reminder.repeatMiles { Text("Repeats every \(miles.formatted()) miles").font(.caption) }
                     if !reminder.notes.isEmpty { Text(reminder.notes).font(.caption) }
                     HStack {
-                        Button("Mark complete") { pendingCompletion = reminder }.buttonStyle(.bordered)
+                        Button("Complete & record") { pendingCompletion = reminder }.buttonStyle(.bordered)
+                        Button(reminder.notificationEnabled ? "Alerts on" : "Enable alert", systemImage: reminder.notificationEnabled ? "bell.fill" : "bell") {
+                            toggleAlert(reminder)
+                        }.buttonStyle(.borderless)
                         Spacer()
                         Button("Delete", role: .destructive) { pendingDeletion = reminder }.buttonStyle(.borderless)
                     }
@@ -52,13 +55,13 @@ struct ScheduledMaintenanceList: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .confirmationDialog("Complete this scheduled service?", isPresented: Binding(get: { pendingCompletion != nil }, set: { if !$0 { pendingCompletion = nil } }), titleVisibility: .visible) {
-            Button("Mark Complete") { if let reminder = pendingCompletion { complete(reminder) }; pendingCompletion = nil }
-            Button("Cancel", role: .cancel) { pendingCompletion = nil }
-        } message: { Text("Repeating deadlines advance from today and the estimated mileage (or confirmed odometer if estimates are off); one-time deadlines are cleared. Add a service record separately to track actual work and cost.") }
+        .sheet(item: $pendingCompletion) { reminder in
+            if let vehicle = reminder.vehicle { AddMaintenanceRecordView(vehicle: vehicle, reminder: reminder) }
+            else { ContentUnavailableView("Vehicle Missing", systemImage: "exclamationmark.triangle", description: Text("This reminder is no longer linked to a vehicle.")) }
+        }
         .confirmationDialog("Delete this schedule?", isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }), titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
-                if let reminder = pendingDeletion { context.delete(reminder); save() }
+                if let reminder = pendingDeletion { ReminderNotificationService.cancel(reminder); context.delete(reminder); save() }
                 pendingDeletion = nil
             }
         }
@@ -67,26 +70,22 @@ struct ScheduledMaintenanceList: View {
         } message: { Text(error ?? "Please try again.") }
     }
 
-    private func complete(_ reminder: MaintenanceReminder) {
-        var nextMileage: Int?
-        if let interval = reminder.repeatMiles {
-            guard let current = reminder.vehicle?.estimatedMileage() else { error = "This schedule needs a vehicle before it can repeat."; return }
-            let result = current.addingReportingOverflow(interval)
-            guard !result.overflow else { error = "The next mileage is too large."; return }
-            nextMileage = result.partialValue
-        }
-        var nextDate: Date?
-        if let months = reminder.repeatMonths {
-            guard let date = Calendar.current.date(byAdding: .month, value: months, to: .now) else { error = "Could not calculate the next date."; return }
-            nextDate = date
-        }
-        if reminder.repeatMonths == nil && reminder.repeatMiles == nil {
-            reminder.completed = true
+    private func toggleAlert(_ reminder: MaintenanceReminder) {
+        if reminder.notificationEnabled {
+            reminder.notificationEnabled = false
+            ReminderNotificationService.cancel(reminder)
+            save()
         } else {
-            reminder.dueDate = nextDate
-            reminder.dueMileage = nextMileage
+            reminder.notificationEnabled = true
+            Task {
+                let enabled = await ReminderNotificationService.enableAndSchedule(reminder)
+                await MainActor.run {
+                    reminder.notificationEnabled = enabled
+                    if !enabled { error = "Notifications are disabled. Enable them for GarageIQ in Settings." }
+                    save()
+                }
+            }
         }
-        save()
     }
 
     private func save() {

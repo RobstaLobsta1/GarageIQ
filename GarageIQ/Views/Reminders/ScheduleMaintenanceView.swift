@@ -14,6 +14,7 @@ struct ScheduleMaintenanceView: View {
     @State private var months = ""
     @State private var miles = ""
     @State private var notes = ""
+    @State private var notifications = false
     @State private var error: String?
 
     var body: some View {
@@ -44,6 +45,7 @@ struct ScheduleMaintenanceView: View {
                     Text("Choose a date, mileage, or both—whichever comes first. Repeat intervals start from the date and current vehicle mileage when you mark the service complete. Leave intervals blank for a one-time service.")
                 }
                 Section("Notes") { TextField("Notes", text: $notes, axis: .vertical) }
+                Section("Alert") { Toggle("Notify me before service is due", isOn: $notifications) }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
             .scrollContentBackground(.hidden)
@@ -74,7 +76,17 @@ struct ScheduleMaintenanceView: View {
         reminder.repeatMonths = useDate ? Int(monthText) : nil
         reminder.repeatMiles = useMileage ? Int(mileText) : nil
         context.insert(reminder)
-        do { try context.save(); dismiss() }
+        do {
+            try context.save()
+            if notifications {
+                reminder.notificationEnabled = true
+                Task {
+                    let enabled = await ReminderNotificationService.enableAndSchedule(reminder)
+                    await MainActor.run { reminder.notificationEnabled = enabled; try? context.save() }
+                }
+            }
+            dismiss()
+        }
         catch { context.rollback(); self.error = "Could not save the schedule. \(error.localizedDescription)" }
     }
 }

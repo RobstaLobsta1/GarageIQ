@@ -79,12 +79,19 @@ struct AssistantView: View {
         defer { busy = false }
         let now = Date.now
         let formatter = ISO8601DateFormatter()
+        let localClock = DateFormatter()
+        localClock.locale = Locale(identifier: "en_US_POSIX")
+        localClock.timeZone = .current
+        localClock.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
         let payload: [String: Any] = [
-            "asOf": formatter.string(from: now), "routine": routine,
+            "asOf": formatter.string(from: now), "localDateTime": localClock.string(from: now),
+            "timeZone": TimeZone.current.identifier, "routine": routine,
             "vehicle": ["year": vehicle.year, "make": vehicle.make, "model": vehicle.model, "trim": vehicle.trim,
                         "confirmedMileage": vehicle.currentMileage, "estimatedMileage": vehicle.estimatedMileage(at: now),
                         "estimatesEnabled": vehicle.estimatedMilesPerPeriod != nil,
-                        "use": vehicle.drivingPurpose ?? "Unknown", "weeklyMiles": vehicle.dailyDrivingMiles * 7] as [String: Any],
+                        "use": vehicle.drivingPurpose ?? "Unknown", "weeklyMiles": vehicle.dailyDrivingMiles * 7,
+                        "adaptiveDailyMiles": vehicle.mileageForecast(at: now).dailyMiles as Any? ?? NSNull(),
+                        "drivingComparison": vehicle.mileageForecast(at: now).drivingComparison] as [String: Any],
             "records": vehicle.maintenanceRecords.map { ["serviceType": $0.serviceType, "date": formatter.string(from: $0.date), "mileage": $0.mileage] as [String: Any] },
             "schedules": vehicle.maintenanceReminders.filter { !$0.completed }.map { ["title": $0.title, "dueDate": $0.dueDate.map { formatter.string(from: $0) } ?? "Unknown", "dueMileage": $0.dueMileage.map(String.init) ?? "Unknown"] }
         ]
@@ -98,7 +105,7 @@ struct AssistantView: View {
     private func apply(_ miles: Int) {
         guard let vehicle = vehicles.first(where: { $0.id == analyzedVehicleID }), analyzedVehicleID == selectedID else { return }
         var form = VehicleFormData(vehicle: vehicle)
-        form.estimateEnabled = true; form.drivingPeriod = "Weekly"; form.drivingMiles = String(miles)
+        form.drivingPeriod = "Weekly"; form.drivingMiles = String(miles)
         guard form.validationErrors.isEmpty else { error = form.validationErrors.joined(separator: " "); return }
         form.apply(to: vehicle)
         do { try context.save(); applied = true } catch { context.rollback(); self.error = error.localizedDescription }

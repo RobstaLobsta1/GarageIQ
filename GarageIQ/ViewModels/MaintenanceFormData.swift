@@ -8,8 +8,9 @@ struct MaintenanceFormData {
     var shop = ""
     var notes = ""
 
-    init(vehicle: Vehicle, record: MaintenanceRecord? = nil) {
+    init(vehicle: Vehicle, record: MaintenanceRecord? = nil, reminder: MaintenanceReminder? = nil) {
         mileage = String(vehicle.currentMileage)
+        if let reminder { serviceType = reminder.title }
         guard let record else { return }
         serviceType = record.serviceType
         date = record.date

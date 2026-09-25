@@ -109,15 +109,29 @@ struct ChatView: View {
                 HStack { Text(field.0).foregroundStyle(.secondary); Spacer(); Text(field.1) }
             }
             if message.proposalStatus == "pending" {
+                if proposal.needsRequiredDrivingProfile {
+                    Text("Reply in chat with your driving routine. GarageIQ will build the profile for you.")
+                        .font(.caption).foregroundStyle(.orange)
+                } else if !proposal.isValid {
+                    Text("This proposal is incomplete. Ask the assistant to correct the missing vehicle details.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
                 HStack {
                     if proposal.operation == "delete" {
                         Button("Delete vehicle…", role: .destructive) { deletionMessageID = message.id }.buttonStyle(.bordered)
                     } else {
-                        Button(proposal.operation == "record" ? "Save service" : proposal.operation == "schedule" ? "Save schedule" : "Save vehicle") { resolve(message.id, save: true) }.buttonStyle(.borderedProminent)
+                        Button(proposal.operation == "record" ? "Save service" : proposal.operation == "schedule" ? "Save schedule" : "Save vehicle") { resolve(message.id, save: true) }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!proposal.isValid)
                     }
                     Button("Dismiss") { resolve(message.id, save: false) }.buttonStyle(.bordered)
                 }.disabled(busy)
-            } else { Text(message.proposalStatus == "saved" ? (proposal.operation == "delete" ? "Vehicle deleted" : (proposal.operation == "record" ? "Service saved" : proposal.operation == "schedule" ? "Schedule saved" : "Saved to your garage")) : "Dismissed").font(.caption) }
+            } else {
+                Text(message.proposalStatus == "saved"
+                     ? (proposal.operation == "delete" ? "Vehicle deleted" : (proposal.operation == "record" ? "Service saved" : proposal.operation == "schedule" ? "Schedule saved" : "Saved to your garage"))
+                     : (message.proposalStatus == "continued" ? "Continued in chat" : "Dismissed"))
+                    .font(.caption)
+            }
         }.padding()
             .background(GarageTheme.surface, in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(GarageTheme.border, lineWidth: 1))
@@ -127,7 +141,9 @@ struct ChatView: View {
         // Detect edits made after a proposal was generated, including after relaunch.
         let values = [vehicle.nickname, String(vehicle.year), vehicle.make, vehicle.model, vehicle.trim,
                       String(vehicle.currentMileage), vehicle.vin ?? "", vehicle.licensePlate ?? "",
-                      vehicle.drivingPurpose ?? "", vehicle.drivingPeriod ?? "", vehicle.estimatedMilesPerPeriod.map(String.init) ?? ""]
+                      vehicle.drivingPurpose ?? "", vehicle.drivingPeriod ?? "", vehicle.estimatedMilesPerPeriod.map(String.init) ?? "",
+                      vehicle.drivingHistoryStartDate.map { ISO8601DateFormatter().string(from: $0) } ?? "",
+                      vehicle.odometerHistoryData?.base64EncodedString() ?? ""]
         return (try? JSONEncoder().encode(values).base64EncodedString()) ?? ""
     }
 
@@ -176,7 +192,10 @@ struct ChatView: View {
                     vehicle.estimateStartMileage = proposal.currentMileage ?? vehicle.estimatedMileage()
                     vehicle.estimateStartDate = .now
                 }
-                if let value = proposal.currentMileage { vehicle.currentMileage = value; vehicle.odometerConfirmedDate = .now }
+                if let value = proposal.currentMileage { vehicle.confirmMileage(value) }
+                if let acquiredDate = proposal.parsedAcquiredDate, let acquiredMileage = proposal.acquiredMileage {
+                    vehicle.addHistoricalMileage(acquiredMileage, at: acquiredDate)
+                }
                 if let value = proposal.drivingPurpose { vehicle.drivingPurpose = value }
                 if let value = proposal.drivingPeriod { vehicle.drivingPeriod = value }
                 if let value = proposal.estimatedMilesPerPeriod { vehicle.estimatedMilesPerPeriod = value }
@@ -223,6 +242,10 @@ struct ChatView: View {
             "asOf": date.string(from: .now), "year": vehicle.year, "make": vehicle.make, "model": vehicle.model, "trim": vehicle.trim,
             "confirmedMileage": vehicle.currentMileage, "estimatedMileage": vehicle.estimatedMileage(), "estimated": vehicle.estimatedMilesPerPeriod != nil,
             "drivingUse": vehicle.drivingPurpose ?? "Unknown", "dailyMiles": vehicle.dailyDrivingMiles,
+            "adaptiveDailyMiles": vehicle.mileageForecast().dailyMiles as Any? ?? NSNull(),
+            "observedDailyMiles": vehicle.mileageForecast().observedDailyMiles as Any? ?? NSNull(),
+            "drivingComparison": vehicle.mileageForecast().drivingComparison,
+            "odometerReadings": vehicle.odometerReadings.suffix(30).map { ["date": date.string(from: $0.date), "mileage": $0.mileage] as [String: Any] },
             "drivingPeriod": vehicle.drivingPeriod ?? "Unknown", "estimatedMilesPerPeriod": vehicle.estimatedMilesPerPeriod as Any? ?? NSNull(),
             "odometerConfirmedDate": vehicle.odometerConfirmedDate.map { date.string(from: $0) } ?? "Unknown",
             "services": vehicle.maintenanceRecords.map { ["service": $0.serviceType, "date": date.string(from: $0.date), "mileage": $0.mileage] as [String: Any] },
@@ -233,8 +256,21 @@ struct ChatView: View {
         localDate.locale = Locale(identifier: "en_US_POSIX")
         localDate.calendar = Calendar(identifier: .gregorian)
         localDate.dateFormat = "yyyy-MM-dd"
-        let snapshot: [String: Any] = ["localDate": localDate.string(from: .now), "timeZone": TimeZone.current.identifier, "vehicles": garage, "asOf": date.string(from: .now)]
-        let next = messages + [ChatMessage(role: "user", content: text)]
+        let localClock = DateFormatter()
+        localClock.locale = Locale(identifier: "en_US_POSIX")
+        localClock.calendar = Calendar(identifier: .gregorian)
+        localClock.timeZone = .current
+        localClock.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
+        let snapshot: [String: Any] = ["localDate": localDate.string(from: .now),
+            "localDateTime": localClock.string(from: .now), "timeZone": TimeZone.current.identifier,
+            "vehicles": garage, "asOf": date.string(from: .now)]
+        let continuedMessages = messages.map { message -> ChatMessage in
+            guard message.proposalStatus == "pending", message.proposal?.needsRequiredDrivingProfile == true else { return message }
+            var continued = message
+            continued.proposalStatus = "continued"
+            return continued
+        }
+        let next = continuedMessages + [ChatMessage(role: "user", content: text)]
         do {
             let history = next.map { message -> [String: String] in
                 var content = message.content
@@ -244,10 +280,15 @@ struct ChatView: View {
                 if let status = message.proposalStatus { content += "\nProposal status: \(status)" }
                 return ["role": message.role, "content": content]
             }
-            let payload = try JSONSerialization.data(withJSONObject: ["supportsServiceRecords": true, "supportsScheduling": true, "supportsVehicleDeletion": true, "supportsVehicleChanges": true, "vehicleContext": snapshot, "messages": history])
+            let payload = try JSONSerialization.data(withJSONObject: ["requiresDrivingProfileForNewVehicles": true, "supportsServiceRecords": true, "supportsScheduling": true, "supportsVehicleDeletion": true, "supportsVehicleChanges": true, "vehicleContext": snapshot, "messages": history])
             try await ChatService(endpoint: url).stream(payload: payload, onDelta: { partial += $0 }, onProposal: { receivedProposal = $0 })
             try Task.checkCancellation()
-            if partial.isEmpty && receivedProposal != nil { partial = "Review this proposed change below. It has not been saved yet." }
+            if let proposal = receivedProposal, proposal.needsRequiredDrivingProfile {
+                let question = proposal.drivingProfileQuestion
+                if !partial.contains(question) { partial += (partial.isEmpty ? "" : "\n\n") + question }
+            } else if partial.isEmpty && receivedProposal != nil {
+                partial = "Review this proposed change below. It has not been saved yet."
+            }
             guard !partial.isEmpty else { throw NSError(domain: "Chat", code: 0, userInfo: [NSLocalizedDescriptionKey: "No reply received. Retry."]) }
             let completed = next + [ChatMessage(role: "assistant", content: partial, proposal: receivedProposal, proposalTarget: receivedProposal.flatMap { p in vehicles.first { $0.id.uuidString == p.vehicleID }.map { "\($0.nickname) \(String($0.year)) \($0.make) \($0.model)" } }, vehicleBaseline: receivedProposal.flatMap { p in p.vehicleID.flatMap { baselines[$0] } }, proposalStatus: receivedProposal == nil ? nil : "pending")]
             let saved = conversation ?? ChatConversation()

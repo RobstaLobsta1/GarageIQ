@@ -9,10 +9,9 @@ struct VehicleFormData {
     var currentMileage = "0"
     var vin = ""
     var licensePlate = ""
-    var estimateEnabled = false
     var drivingMiles = ""
     var drivingPeriod = "Weekly"
-    var drivingPurpose = "Commuting"
+    var drivingPurpose = ""
     var confirmOdometer = false
 
     init(vehicle: Vehicle? = nil) {
@@ -25,11 +24,11 @@ struct VehicleFormData {
         currentMileage = String(vehicle.currentMileage)
         vin = vehicle.vin ?? ""
         licensePlate = vehicle.licensePlate ?? ""
-        estimateEnabled = vehicle.estimatedMilesPerPeriod != nil
         drivingMiles = vehicle.estimatedMilesPerPeriod.map(String.init) ?? ""
         drivingPeriod = vehicle.drivingPeriod ?? "Weekly"
-        drivingPurpose = vehicle.drivingPurpose ?? "Commuting"
+        drivingPurpose = vehicle.drivingPurpose ?? ""
     }
+
 
     var maximumYear: Int { Calendar.current.component(.year, from: .now) + 1 }
     var parsedYear: Int? { Int(year.trimmingCharacters(in: .whitespacesAndNewlines)) }
@@ -49,9 +48,10 @@ struct VehicleFormData {
         if parsedMileage.map({ $0 >= 0 }) != true {
             errors.append("Mileage must be a whole number of zero or greater.")
         }
-        if estimateEnabled && Int(drivingMiles.trimmingCharacters(in: .whitespacesAndNewlines)).map({ (0...100000).contains($0) }) != true {
+        if Int(drivingMiles.trimmingCharacters(in: .whitespacesAndNewlines)).map({ (0...100000).contains($0) }) != true {
             errors.append("Estimated driving must be a whole number between 0 and 100,000 miles per period.")
         }
+        if drivingPurpose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { errors.append("Vehicle use is required.") }
         return errors
     }
 
@@ -63,7 +63,7 @@ struct VehicleFormData {
         vehicle.model = model.trimmingCharacters(in: .whitespacesAndNewlines)
         vehicle.trim = trim.trimmingCharacters(in: .whitespacesAndNewlines)
         let now = Date.now
-        let newRate = estimateEnabled ? Int(drivingMiles.trimmingCharacters(in: .whitespacesAndNewlines)) : nil
+        let newRate = Int(drivingMiles.trimmingCharacters(in: .whitespacesAndNewlines))
         let odometerChanged = mileage != vehicle.currentMileage || confirmOdometer
         let profileChanged = newRate != vehicle.estimatedMilesPerPeriod || drivingPeriod != vehicle.drivingPeriod
         if odometerChanged || vehicle.estimateStartDate == nil || profileChanged {
@@ -72,8 +72,7 @@ struct VehicleFormData {
             vehicle.estimateStartMileage = baseline
             vehicle.estimateStartDate = now
         }
-        if odometerChanged || vehicle.odometerConfirmedDate == nil { vehicle.odometerConfirmedDate = now }
-        vehicle.currentMileage = mileage
+        if odometerChanged || vehicle.odometerConfirmedDate == nil { vehicle.confirmMileage(mileage, at: now) }
         vehicle.estimatedMilesPerPeriod = newRate
         vehicle.drivingPeriod = drivingPeriod
         vehicle.drivingPurpose = drivingPurpose

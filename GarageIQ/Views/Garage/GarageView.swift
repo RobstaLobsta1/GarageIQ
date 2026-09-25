@@ -7,6 +7,7 @@ struct GarageView: View {
     @State private var showingAddVehicle = false
     @State private var vehicleToEdit: Vehicle?
     @State private var vehicleToDelete: Vehicle?
+    @State private var vehicleForOdometer: Vehicle?
     @State private var deleteError: String?
 
     var body: some View {
@@ -43,6 +44,10 @@ struct GarageView: View {
                         Button("Edit") { vehicleToEdit = vehicle }
                             .tint(.blue)
                     }
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        Button("Odometer", systemImage: "gauge.with.dots.needle.50percent") { vehicleForOdometer = vehicle }
+                            .tint(GarageTheme.accent)
+                    }
                 }
             }
             .overlay {
@@ -70,6 +75,7 @@ struct GarageView: View {
             }
             .sheet(isPresented: $showingAddVehicle) { AddVehicleView() }
             .sheet(item: $vehicleToEdit) { vehicle in AddVehicleView(vehicle: vehicle) }
+            .sheet(item: $vehicleForOdometer) { UpdateOdometerView(vehicle: $0) }
             .confirmationDialog("Delete this vehicle?", isPresented: Binding(
                 get: { vehicleToDelete != nil },
                 set: { if !$0 { vehicleToDelete = nil } }

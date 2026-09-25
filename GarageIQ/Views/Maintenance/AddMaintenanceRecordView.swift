@@ -9,11 +9,13 @@ struct AddMaintenanceRecordView: View {
     @State private var saveError: String?
     private let vehicle: Vehicle
     private let record: MaintenanceRecord?
+    private let reminder: MaintenanceReminder?
 
-    init(vehicle: Vehicle, record: MaintenanceRecord? = nil) {
+    init(vehicle: Vehicle, record: MaintenanceRecord? = nil, reminder: MaintenanceReminder? = nil) {
         self.vehicle = vehicle
         self.record = record
-        _form = State(initialValue: MaintenanceFormData(vehicle: vehicle, record: record))
+        self.reminder = reminder
+        _form = State(initialValue: MaintenanceFormData(vehicle: vehicle, record: record, reminder: reminder))
     }
 
     var body: some View {
@@ -52,7 +54,7 @@ struct AddMaintenanceRecordView: View {
             .background(GarageTheme.background)
             .toolbarBackground(GarageTheme.chrome, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .navigationTitle(record == nil ? "Add Service" : "Edit Service")
+            .navigationTitle(record == nil ? (reminder == nil ? "Add Service" : "Complete Service") : "Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -77,8 +79,23 @@ struct AddMaintenanceRecordView: View {
             modelContext.insert(savedRecord)
         }
         form.apply(to: savedRecord)
+        if let reminder {
+            if reminder.repeatMonths == nil && reminder.repeatMiles == nil {
+                reminder.completed = true
+            } else {
+                if let months = reminder.repeatMonths {
+                    reminder.dueDate = Calendar.current.date(byAdding: .month, value: months, to: form.date)
+                } else { reminder.dueDate = nil }
+                if let miles = reminder.repeatMiles {
+                    let result = mileage.addingReportingOverflow(miles)
+                    guard !result.overflow else { saveError = "The next mileage is too large."; return }
+                    reminder.dueMileage = result.partialValue
+                } else { reminder.dueMileage = nil }
+            }
+        }
         do {
             try modelContext.save()
+            if let reminder { Task { await ReminderNotificationService.schedule(reminder) } }
             dismiss()
         } catch {
             modelContext.rollback()
